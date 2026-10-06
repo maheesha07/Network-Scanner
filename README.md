@@ -125,4 +125,4 @@ Do not use this tool for unauthorized scanning, intrusion attempts, exploitation
 
 ## Author
 
-maheesha07
+Maheesha Dassannayake
