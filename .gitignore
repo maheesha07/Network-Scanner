@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+network_scan_*.txt
+network_scan_*.csv
+scan_results_*.txt
+scan_results_*.csv
