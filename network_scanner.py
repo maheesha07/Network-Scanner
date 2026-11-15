@@ -24,18 +24,12 @@ DEFAULT_END_PORT = 500
 DEFAULT_WORKERS = 32
 MAX_WORKERS = 128
 
-# The supplied banner has been restored to its intended 10-line layout.
-# These glyphs need UTF-8 terminal support; narrow terminals use a compact title.
-BANNER = r"""██▓███   ▒█████   ██▀███  ▄▄▄█████▓     ██████  ▄████▄   ▄▄▄       ███▄    █  ███▄    █ ▓█████  ██▀███
-▓██░  ██▒▒██▒  ██▒▓██ ▒ ██▒▓  ██▒ ▓▒   ▒██    ▒ ▒██▀ ▀█  ▒████▄     ██ ▀█   █  ██ ▀█   █ ▓█   ▀ ▓██ ▒ ██▒
-▓██░ ██▓▒▒██░  ██▒▓██ ░▄█ ▒▒ ▓██░ ▒░   ░ ▓██▄   ▒▓█    ▄ ▒██  ▀█▄  ▓██  ▀█ ██▒▓██  ▀█ ██▒▒███   ▓██ ░▄█ ▒
-▒██▄█▓▒ ▒▒██   ██░▒██▀▀█▄  ░ ▓██▓ ░      ▒   ██▒▒▓▓▄ ▄██▒░██▄▄▄▄██ ▓██▒  ▐▌██▒▓██▒  ▐▌██▒▒▓█  ▄ ▒██▀▀█▄
-▒██▒ ░  ░░ ████▓▒░░██▓ ▒██▒  ▒██▒ ░    ▒██████▒▒▒ ▓███▀ ░ ▓█   ▓██▒▒██░   ▓██░▒██░   ▓██░░▒████▒░██▓ ▒██▒
-▒▓▒░ ░  ░░ ▒░▒░▒░ ░ ▒▓ ░▒▓░  ▒ ░░      ▒ ▒▓▒ ▒ ░░ ░▒ ▒  ░ ▒▒   ▓▒█░░ ▒░   ▒ ▒ ░ ▒░   ▒ ▒ ░░ ▒░ ░░ ▒▓ ░▒▓░
-░▒ ░       ░ ▒ ▒░   ░▒ ░ ▒░    ░       ░ ░▒  ░ ░  ░  ▒     ▒   ▒▒ ░░ ░░   ░ ▒░░ ░░   ░ ▒░ ░ ░  ░  ░▒ ░ ▒░
-░░       ░ ░ ░ ▒    ░░   ░   ░         ░  ░  ░  ░          ░   ▒      ░   ░ ░    ░   ░ ░    ░     ░░   ░
-                 ░ ░     ░                       ░  ░ ░            ░  ░         ░          ░    ░  ░   ░
-                                                        ░"""
+# ASCII art works without special terminal font or encoding support.
+BANNER = r"""       ____             __
+      / __ \____  _____/ /_    ______________ _____  ____  ___  _____
+     / /_/ / __ \/ ___/ __/   / ___/ ___/ __ `/ __ \/ __ \/ _ \/ ___/
+    / ____/ /_/ / /  / /_    (__  ) /__/ /_/ / / / / / / /  __/ /
+   /_/    \____/_/   \__/   /____/\___/\__,_/_/ /_/_/ /_/\___/_/"""
 
 COMMON_SERVICES = {
     20: "FTP Data", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP",
@@ -245,8 +239,8 @@ def show_banner(term: Terminal) -> None:
         print(term.color(BANNER, term.CYAN))
     else:
         print(term.color("[ PORT SCANNER ]", term.CYAN))
-        print(term.color(f"[INFO] Original ASCII banner needs at least {max(map(len, BANNER.splitlines()))} columns; resize terminal to display it.", term.YELLOW))
-    print(term.color("MAHEESHA DASSANAYAKE", term.CYAN))
+        print(term.color(f"[INFO] Widen the terminal to {max(map(len, BANNER.splitlines()))} columns to show the full banner.", term.YELLOW))
+    print(term.color("Maheesha Dassanayake", term.CYAN))
     print("PYTHON NETWORK PORT SCANNER")
     print(f"VERSION {VERSION}")
 

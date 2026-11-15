@@ -57,7 +57,7 @@ py -3 network_scanner.py --help
 
 Or unzip the downloaded project, open PowerShell in the `Network-Scanner` directory, and run the same Python command. If `py` is unavailable, use `python` instead.
 
-The original extended-character banner needs a UTF-8 terminal and a width of at least **105 columns**; when narrower, the CLI automatically prints a compact title without wrapping. On older Windows consoles, `chcp 65001` may help; Windows Terminal is recommended. The application remains functional without the full banner or colors.
+The ASCII banner fits terminals at least **69 columns** wide. Narrower terminals show a compact title. The application remains functional without the full banner or colors.
 
 ## CLI usage
 
