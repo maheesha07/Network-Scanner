@@ -290,7 +290,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    arguments = sys.argv[1:] if argv is None else argv
+    if ("-h" in arguments or "--help" in arguments) and "--no-banner" not in arguments:
+        term = Terminal(use_color("--no-color" in arguments))
+        show_banner(term)
+        print()
+    args = parser.parse_args(arguments)
     try:
         validate_port_range(args.start_port, args.end_port)
         if not 1 <= args.workers <= MAX_WORKERS:
