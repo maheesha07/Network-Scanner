@@ -7,7 +7,14 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Generated reports (keep the folder itself)
+reports/*
+!reports/.gitkeep
 network_scan_*.txt
 network_scan_*.csv
 scan_results_*.txt
 scan_results_*.csv
+
+# Test artifacts
+.coverage
+.pytest_cache/
