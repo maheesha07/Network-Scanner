@@ -73,7 +73,7 @@ class ScannerTests(unittest.TestCase):
                 self.assertIn("error:", run.stderr.lower())
 
     def test_invalid_hostname(self):
-        run = self.run_cli("not-a-host.invalid", "--no-banner", "--no-progress")
+        run = self.run_cli("not-a-host.invalid", "--no-progress")
         self.assertEqual(run.returncode, 2)
         self.assertIn("Unable to resolve target", run.stderr)
 

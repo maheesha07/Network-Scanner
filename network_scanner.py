@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import os
 import shutil
 import socket
@@ -23,6 +24,7 @@ DEFAULT_START_PORT = 1
 DEFAULT_END_PORT = 500
 DEFAULT_WORKERS = 32
 MAX_WORKERS = 128
+DISCOVERY_PORTS = (22, 53, 80, 135, 139, 443, 445, 3389, 8080)
 
 # ASCII art works without special terminal font or encoding support.
 BANNER = r"""       ____             __
@@ -174,6 +176,35 @@ def scan_ports(
     return summary, results
 
 
+def discover_hosts(network_text: str, timeout: float = SOCKET_TIMEOUT_SECONDS) -> list[str]:
+    """Find IPv4 hosts that accept a connection on a common TCP port.
+
+    TCP discovery can miss devices that block these ports. Limit discovery to
+    one /24-sized network to keep the interactive scan bounded.
+    """
+    try:
+        network = ipaddress.ip_network(network_text, strict=False)
+    except ValueError as error:
+        raise ValueError("Enter a valid IPv4 network, such as 192.168.1.0/24.") from error
+    if network.version != 4:
+        raise ValueError("Host discovery supports IPv4 networks only.")
+    if network.num_addresses > 256:
+        raise ValueError("Host discovery is limited to 256 addresses per scan.")
+
+    addresses = [str(address) for address in network.hosts()]
+
+    def responds(address: str) -> bool:
+        return any(is_tcp_port_open(address, port, timeout) for port in DISCOVERY_PORTS)
+
+    live_hosts: list[str] = []
+    with ThreadPoolExecutor(max_workers=DEFAULT_WORKERS) as executor:
+        futures = {executor.submit(responds, address): address for address in addresses}
+        for future in as_completed(futures):
+            if future.result():
+                live_hosts.append(futures[future])
+    return sorted(live_hosts, key=lambda address: tuple(int(part) for part in address.split(".")))
+
+
 def write_txt_report(file_path: Path, summary: ScanSummary, open_ports: list[PortResult]) -> None:
     """Adapt the original GUI's readable TXT export format."""
     with file_path.open("w", encoding="utf-8") as report:
@@ -277,53 +308,52 @@ def build_parser() -> argparse.ArgumentParser:
     output_options.add_argument("--export-txt", type=Path, metavar="FILE", help="save a readable TXT report")
     output_options.add_argument("--no-color", action="store_true", help="disable terminal colors")
     output_options.add_argument("--no-progress", action="store_true", help="hide progress updates")
-    output_options.add_argument("--no-banner", action="store_true", help="hide startup banner")
     parser.add_argument("--version", action="version", version=f"Network Scanner {VERSION}")
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    arguments = sys.argv[1:] if argv is None else argv
-    if ("-h" in arguments or "--help" in arguments) and "--no-banner" not in arguments:
-        term = Terminal(use_color("--no-color" in arguments))
-        show_banner(term)
-        print()
-    args = parser.parse_args(arguments)
+def run_scan(
+    target: str,
+    start_port: int,
+    end_port: int,
+    workers: int,
+    timeout: float,
+    export_txt: Path | None,
+    progress_enabled: bool,
+    term: Terminal,
+) -> int:
     try:
-        validate_port_range(args.start_port, args.end_port)
-        if not 1 <= args.workers <= MAX_WORKERS:
+        validate_port_range(start_port, end_port)
+        if not 1 <= workers <= MAX_WORKERS:
             raise ValueError(f"Workers must be between 1 and {MAX_WORKERS}.")
-        if not 0 < args.timeout <= 10:
+        if not 0 < timeout <= 10:
             raise ValueError("Timeout must be greater than 0 and at most 10 seconds.")
-        if not args.target.strip():
+        if not target.strip():
             raise ValueError("Target IP address or hostname cannot be empty.")
     except ValueError as error:
-        parser.error(str(error))
+        print(term.color(f"[ERROR] {error}", term.RED), file=sys.stderr)
+        return 2
 
-    term = Terminal(use_color(args.no_color))
-    if not args.no_banner:
-        show_banner(term)
     print(term.color("\n[INFO] Resolving target...", term.YELLOW))
     try:
-        resolved = resolve_target(args.target)
+        resolved = resolve_target(target)
     except (socket.gaierror, socket.herror, OSError) as error:
-        print(term.color(f"[ERROR] Unable to resolve target '{args.target}': {error}", term.RED), file=sys.stderr)
+        print(term.color(f"[ERROR] Unable to resolve target '{target}': {error}", term.RED), file=sys.stderr)
         return 2
 
     term.heading("TARGET INFORMATION")
-    print(f"Target       : {args.target}")
+    print(f"Target       : {target}")
     print(f"Resolved IP  : {resolved[0]}")
     print(f"Hostname     : {resolved[1]}")
-    print(f"Port Range   : {args.start_port}-{args.end_port}")
+    print(f"Port Range   : {start_port}-{end_port}")
     print("Scan Type    : TCP Connect Scan")
-    print(f"Workers      : {args.workers}")
-    print(f"Timeout      : {args.timeout:g} seconds")
+    print(f"Workers      : {workers}")
+    print(f"Timeout      : {timeout:g} seconds")
 
-    total = args.end_port - args.start_port + 1
+    total = end_port - start_port + 1
     progress_step = max(1, total // 20)
-    progress_enabled = not args.no_progress
     last_progress = 0
+
     def report_progress(scanned: int, count: int, found: int) -> None:
         nonlocal last_progress
         if progress_enabled and (scanned == count or scanned - last_progress >= progress_step):
@@ -333,8 +363,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         print(term.color("\n[INFO] Starting TCP connect scan...", term.YELLOW))
         summary, results = scan_ports(
-            args.target, args.start_port, args.end_port,
-            workers=args.workers, timeout=args.timeout,
+            target, start_port, end_port,
+            workers=workers, timeout=timeout,
             progress=report_progress, resolved=resolved,
         )
     except KeyboardInterrupt:
@@ -345,14 +375,84 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     show_results(term, summary, results)
 
-    if args.export_txt is not None:
+    if export_txt is not None:
         try:
-            write_txt_report(args.export_txt, summary, results)
+            write_txt_report(export_txt, summary, results)
         except OSError as error:
-            print(term.color(f"[ERROR] Could not export TXT report to '{args.export_txt}': {error}", term.RED), file=sys.stderr)
+            print(term.color(f"[ERROR] Could not export TXT report to '{export_txt}': {error}", term.RED), file=sys.stderr)
             return 1
-        print(term.color(f"[OK] TXT report saved: {args.export_txt}", term.GREEN))
+        print(term.color(f"[OK] TXT report saved: {export_txt}", term.GREEN))
     return 0
+
+
+def interactive_menu(term: Terminal) -> int:
+    print("\nChoose option")
+    print("1- See status of one port")
+    print("2- See status of all ports")
+    print("3- See status of port range")
+    print("4- Host Discovery")
+    choice = input("Option: ").strip()
+
+    if choice == "4":
+        network_text = input("Network to discover (example: 192.168.1.0/24): ").strip()
+        print(term.color("\n[INFO] Checking common TCP ports on network hosts...", term.YELLOW))
+        try:
+            hosts = discover_hosts(network_text)
+        except ValueError as error:
+            print(term.color(f"[ERROR] {error}", term.RED), file=sys.stderr)
+            return 2
+        if hosts:
+            for host in hosts:
+                print(f"Host {host} is responding")
+        else:
+            print(term.color("No hosts responded on the checked TCP ports.", term.YELLOW))
+        print(term.color("[INFO] TCP discovery can miss hosts that block the checked ports.", term.YELLOW))
+        return 0
+
+    if choice not in {"1", "2", "3"}:
+        print(term.color("[ERROR] Choose an option from 1 to 4.", term.RED), file=sys.stderr)
+        return 2
+
+    target = input("Which host do you want to scan?\nHost: ").strip()
+    try:
+        if choice == "1":
+            port = int(input("Port: ").strip())
+            start_port = end_port = port
+        elif choice == "2":
+            start_port, end_port = PORT_MIN, PORT_MAX
+        else:
+            start_port = int(input("Start port: ").strip())
+            end_port = int(input("End port: ").strip())
+    except ValueError:
+        print(term.color("[ERROR] Enter port numbers using digits only.", term.RED), file=sys.stderr)
+        return 2
+
+    return run_scan(
+        target, start_port, end_port,
+        DEFAULT_WORKERS, SOCKET_TIMEOUT_SECONDS, None, True, term,
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    arguments = sys.argv[1:] if argv is None else argv
+    term = Terminal(use_color("--no-color" in arguments))
+    show_banner(term)
+    if arguments:
+        print()
+    if not arguments:
+        try:
+            return interactive_menu(term)
+        except KeyboardInterrupt:
+            print(term.color("\n[WARN] Menu cancelled.", term.YELLOW), file=sys.stderr)
+            return 130
+
+    args = parser.parse_args(arguments)
+    return run_scan(
+        args.target, args.start_port, args.end_port,
+        args.workers, args.timeout, args.export_txt,
+        not args.no_progress, term,
+    )
 
 
 if __name__ == "__main__":

@@ -59,7 +59,24 @@ Or unzip the downloaded project, open PowerShell in the `Network-Scanner` direct
 
 The ASCII banner fits terminals at least **69 columns** wide. Narrower terminals show a compact title. The application remains functional without the full banner or colors.
 
-## CLI usage
+## Interactive menu
+
+Run the program without arguments to open the menu shown in the terminal:
+
+```powershell
+py -3 network_scanner.py
+```
+
+Choose one of these operations:
+
+- **1:** Check one TCP port on a host.
+- **2:** Check all TCP ports (`1`–`65535`) on a host.
+- **3:** Check a chosen port range on a host.
+- **4:** Discover hosts in an IPv4 network, such as `192.168.1.0/24`.
+
+Host discovery checks common TCP ports and is limited to 256 addresses per scan. Devices that block those ports may not appear.
+
+## Command-line options
 
 ```text
 network_scanner.py TARGET [options]
@@ -75,7 +92,6 @@ network_scanner.py TARGET [options]
 | `--export-txt FILE` | Save a readable TXT report | — |
 | `--no-color` | Disable terminal colors | Automatic detection |
 | `--no-progress` | Suppress progress messages | Show progress |
-| `--no-banner` | Hide decorative startup banner | Show banner |
 | `--version` | Print the version | — |
 | `-h`, `--help` | Show command help | — |
 
