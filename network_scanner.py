@@ -1,14 +1,8 @@
-"""Command-line TCP connect port scanner for authorized network assessments.
-
-Adapted from the original Tkinter Network Scanner by Maheesha Dassanayake.
-Preserves the original IPv4 resolver, connect_ex scanner, service lookup, and
-TXT/CSV report formats while replacing the GUI with an argparse CLI.
-"""
+"""Command-line TCP connect port scanner for authorized network assessments."""
 
 from __future__ import annotations
 
 import argparse
-import csv
 import os
 import shutil
 import socket
@@ -207,25 +201,6 @@ def write_txt_report(file_path: Path, summary: ScanSummary, open_ports: list[Por
             report.write(f"{result.port:<10}{result.status:<12}{result.service}\n")
 
 
-def write_csv_report(file_path: Path, summary: ScanSummary, open_ports: list[PortResult]) -> None:
-    """Preserve the original machine-readable CSV columns and empty result row."""
-    with file_path.open("w", newline="", encoding="utf-8") as report:
-        writer = csv.writer(report)
-        writer.writerow([
-            "target", "resolved_ip", "hostname", "start_port", "end_port",
-            "scanned_ports", "open_ports", "duration_seconds", "port", "status", "service",
-        ])
-        for result in open_ports or [None]:
-            writer.writerow([
-                summary.target, summary.ip_address, summary.hostname,
-                summary.start_port, summary.end_port, summary.scanned_ports,
-                summary.open_ports, f"{summary.duration_seconds:.2f}",
-                result.port if result else "",
-                result.status if result else "",
-                result.service if result else "",
-            ])
-
-
 class Terminal:
     """Plain-text output with optional ANSI styling (without dependencies)."""
 
@@ -292,19 +267,23 @@ def show_results(term: Terminal, summary: ScanSummary, open_ports: list[PortResu
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Authorized IPv4 TCP connect scanner with service labels and report export.",
+        prog="network_scanner.py",
+        usage="%(prog)s TARGET [options]",
+        description="Scan an IPv4 host for open TCP ports.",
+        formatter_class=argparse.HelpFormatter,
         epilog="Only scan systems you own or are explicitly permitted to test.",
     )
-    parser.add_argument("target", help="IPv4 address or resolvable hostname")
-    parser.add_argument("-s", "--start-port", type=int, default=DEFAULT_START_PORT, metavar="PORT", help=f"first TCP port (default: {DEFAULT_START_PORT})")
-    parser.add_argument("-e", "--end-port", type=int, default=DEFAULT_END_PORT, metavar="PORT", help=f"last TCP port (default: {DEFAULT_END_PORT})")
-    parser.add_argument("-w", "--workers", type=int, default=DEFAULT_WORKERS, metavar="N", help=f"concurrent TCP checks, 1-{MAX_WORKERS} (default: {DEFAULT_WORKERS})")
-    parser.add_argument("--timeout", type=float, default=SOCKET_TIMEOUT_SECONDS, metavar="SECONDS", help=f"connection timeout per port, >0 and <=10 (default: {SOCKET_TIMEOUT_SECONDS})")
-    parser.add_argument("--export-txt", type=Path, metavar="FILE", help="write a human-readable TXT report")
-    parser.add_argument("--export-csv", type=Path, metavar="FILE", help="write a CSV report")
-    parser.add_argument("--no-color", action="store_true", help="disable ANSI terminal colors")
-    parser.add_argument("--no-progress", action="store_true", help="hide progress updates")
-    parser.add_argument("--no-banner", action="store_true", help="hide startup banner")
+    parser.add_argument("target", metavar="TARGET", help="IPv4 address or resolvable hostname")
+    scan_options = parser.add_argument_group("scan options")
+    scan_options.add_argument("-s", "--start-port", type=int, default=DEFAULT_START_PORT, metavar="PORT", help=f"first TCP port (default: {DEFAULT_START_PORT})")
+    scan_options.add_argument("-e", "--end-port", type=int, default=DEFAULT_END_PORT, metavar="PORT", help=f"last TCP port (default: {DEFAULT_END_PORT})")
+    scan_options.add_argument("-w", "--workers", type=int, default=DEFAULT_WORKERS, metavar="N", help=f"concurrent checks, 1-{MAX_WORKERS} (default: {DEFAULT_WORKERS})")
+    scan_options.add_argument("--timeout", type=float, default=SOCKET_TIMEOUT_SECONDS, metavar="SECONDS", help=f"per-port timeout, >0 and <=10 (default: {SOCKET_TIMEOUT_SECONDS})")
+    output_options = parser.add_argument_group("output options")
+    output_options.add_argument("--export-txt", type=Path, metavar="FILE", help="save a readable TXT report")
+    output_options.add_argument("--no-color", action="store_true", help="disable terminal colors")
+    output_options.add_argument("--no-progress", action="store_true", help="hide progress updates")
+    output_options.add_argument("--no-banner", action="store_true", help="hide startup banner")
     parser.add_argument("--version", action="version", version=f"Network Scanner {VERSION}")
     return parser
 
@@ -320,8 +299,6 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("Timeout must be greater than 0 and at most 10 seconds.")
         if not args.target.strip():
             raise ValueError("Target IP address or hostname cannot be empty.")
-        if args.export_txt and args.export_csv and args.export_txt.resolve() == args.export_csv.resolve():
-            raise ValueError("TXT and CSV export paths must be different.")
     except ValueError as error:
         parser.error(str(error))
 
@@ -362,25 +339,20 @@ def main(argv: list[str] | None = None) -> int:
             progress=report_progress, resolved=resolved,
         )
     except KeyboardInterrupt:
-        print(term.color("\n[WARN] Scan interrupted; no reports were exported.", term.YELLOW), file=sys.stderr)
+        print(term.color("\n[WARN] Scan interrupted; no report was exported.", term.YELLOW), file=sys.stderr)
         return 130
     except OSError as error:
         print(term.color(f"[ERROR] Scan failed: {error}", term.RED), file=sys.stderr)
         return 1
     show_results(term, summary, results)
 
-    for path, writer, label in (
-        (args.export_txt, write_txt_report, "TXT"),
-        (args.export_csv, write_csv_report, "CSV"),
-    ):
-        if path is None:
-            continue
+    if args.export_txt is not None:
         try:
-            writer(path, summary, results)
+            write_txt_report(args.export_txt, summary, results)
         except OSError as error:
-            print(term.color(f"[ERROR] Could not export {label} report to '{path}': {error}", term.RED), file=sys.stderr)
+            print(term.color(f"[ERROR] Could not export TXT report to '{args.export_txt}': {error}", term.RED), file=sys.stderr)
             return 1
-        print(term.color(f"[OK] {label} report saved: {path}", term.GREEN))
+        print(term.color(f"[OK] TXT report saved: {args.export_txt}", term.GREEN))
     return 0
 
 

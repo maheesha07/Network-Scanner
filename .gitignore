@@ -11,9 +11,7 @@ Thumbs.db
 reports/*
 !reports/.gitkeep
 network_scan_*.txt
-network_scan_*.csv
 scan_results_*.txt
-scan_results_*.csv
 
 # Test artifacts
 .coverage

@@ -4,7 +4,7 @@
 **Version:** 1.0.0  
 **GitHub:** [maheesha07](https://github.com/maheesha07)
 
-A lightweight, terminal-only **IPv4 TCP connect port scanner** for learning Python networking and performing authorized system assessments. This is a CLI refactor of the original Tkinter-based Network Scanner, preserving its socket-based scanning, hostname resolution, conventional port-to-service lookup, scan summaries, and TXT/CSV reports.
+A lightweight, terminal-only **IPv4 TCP connect port scanner** for learning Python networking and performing authorized system assessments. It provides socket-based scanning, hostname resolution, conventional port-to-service lookup, scan summaries, and readable TXT reports.
 
 > **Authorization required:** Only scan computers or networks you own or have explicit permission to test.
 
@@ -16,7 +16,7 @@ A lightweight, terminal-only **IPv4 TCP connect port scanner** for learning Pyth
 - Bounded thread pool (default: 32, maximum: 128 workers) with configurable per-port timeout
 - Terminal progress, sorted open-port table, scan duration, and summary
 - Original common TCP service-name mapping, plus OS service database fallback
-- Preserved TXT and CSV report formats, including records for scans with no open ports
+- Optional readable TXT reports, including scans with no open ports
 - Optional ANSI colors, automatic plain-text fallback, and `--no-color`
 - Input validation, useful nonzero exit codes, Ctrl+C handling
 - No GUI, Tkinter, Colorama, or third-party Python dependencies
@@ -26,7 +26,7 @@ A lightweight, terminal-only **IPv4 TCP connect port scanner** for learning Pyth
 ## Requirements / technologies
 
 - Python **3.10 or newer**
-- Standard library: `argparse`, `socket`, `concurrent.futures`, `threading`, `csv`, `pathlib`, `time`, `dataclasses`, `datetime`
+- Standard library: `argparse`, `socket`, `concurrent.futures`, `threading`, `pathlib`, `time`, `dataclasses`, `datetime`
 - Windows Terminal/PowerShell or a UTF-8-capable Linux terminal recommended for the decorative ASCII banner
 
 `requirements.txt` intentionally contains no packages to install.
@@ -62,10 +62,7 @@ The original extended-character banner needs a UTF-8 terminal and a width of at 
 ## CLI usage
 
 ```text
-python3 network_scanner.py TARGET [-s PORT] [-e PORT] [-w N]
-                                  [--timeout SECONDS] [--export-txt FILE]
-                                  [--export-csv FILE] [--no-color]
-                                  [--no-progress] [--no-banner]
+network_scanner.py TARGET [options]
 ```
 
 | Option | Description | Default |
@@ -75,8 +72,7 @@ python3 network_scanner.py TARGET [-s PORT] [-e PORT] [-w N]
 | `-e`, `--end-port` | Last TCP port | `500` |
 | `-w`, `--workers` | Number of concurrent connections (`1`–`128`) | `32` |
 | `--timeout` | Per-port socket timeout (`>0`, up to `10` seconds) | `0.3` |
-| `--export-txt` | Export a readable TXT report to a specified path | — |
-| `--export-csv` | Export a CSV report to a specified path | — |
+| `--export-txt FILE` | Save a readable TXT report | — |
 | `--no-color` | Disable terminal colors | Automatic detection |
 | `--no-progress` | Suppress progress messages | Show progress |
 | `--no-banner` | Hide decorative startup banner | Show banner |
@@ -97,10 +93,10 @@ python3 network_scanner.py 127.0.0.1 -s 1 -e 1000
 # Check a custom range on localhost
 python3 network_scanner.py 127.0.0.1 -s 20 -e 100
 
-# Save TXT and CSV reports; create reports/ first if needed
+# Save a TXT report; create reports/ first if needed
 mkdir -p reports
 python3 network_scanner.py 127.0.0.1 -s 1 -e 1000 \
-  --export-txt reports/scan.txt --export-csv reports/scan.csv
+  --export-txt reports/scan.txt
 
 # Use fewer workers / longer timeout and hide progress
 python3 network_scanner.py 127.0.0.1 -s 1 -e 100 -w 8 --timeout 1 --no-progress
@@ -147,14 +143,13 @@ The application never hardcodes discovered ports. A port's service label reflect
 
 ## Report exporting
 
-Use `--export-txt` and/or `--export-csv` to choose the filenames. Parent directories must already exist; exporting to an unwritable or missing directory produces a clear error message. Export files are created after a successful scan and are plain UTF-8 text/CSV without terminal color sequences. A successful scan with no open ports still creates a valid report.
+Use `--export-txt` to choose a report filename. Parent directories must already exist; exporting to an unwritable or missing directory produces a clear error message. Reports are plain UTF-8 text without terminal color sequences. A successful scan with no open ports still creates a valid report.
 
 ```bash
-python3 network_scanner.py localhost -s 1 -e 100 --export-txt reports/local.txt --export-csv reports/local.csv
+python3 network_scanner.py localhost -s 1 -e 100 --export-txt reports/local.txt
 ```
 
 - **TXT** includes target, resolved IP, reverse hostname, scanned range, duration, timestamp, and the discovered ports table.
-- **CSV** maintains the original columns: `target,resolved_ip,hostname,start_port,end_port,scanned_ports,open_ports,duration_seconds,port,status,service`.
 
 ### Scan state and clearing results
 

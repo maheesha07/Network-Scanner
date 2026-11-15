@@ -1,5 +1,4 @@
 """Focused regression tests for the CLI conversion of the original scanner."""
-import csv
 import socket
 import subprocess
 import sys
@@ -31,15 +30,8 @@ class ScannerTests(unittest.TestCase):
         summary = scanner.ScanSummary("localhost", "127.0.0.1", "localhost", 1, 2, 2, 0, 0.03)
         with tempfile.TemporaryDirectory() as folder:
             txt = Path(folder) / "report.txt"
-            csv_file = Path(folder) / "report.csv"
             scanner.write_txt_report(txt, summary, [])
-            scanner.write_csv_report(csv_file, summary, [])
             self.assertIn("No open TCP ports found", txt.read_text(encoding="utf-8"))
-            with csv_file.open(newline="", encoding="utf-8") as stream:
-                lines = list(csv.DictReader(stream))
-            self.assertEqual(len(lines), 1)
-            self.assertEqual(lines[0]["open_ports"], "0")
-            self.assertEqual(lines[0]["port"], "")
 
     def test_mocked_open_ports_sorted_and_counts(self):
         with patch.object(scanner, "is_tcp_port_open", side_effect=lambda ip, port, timeout: port in (81, 83)):
@@ -61,14 +53,9 @@ class ScannerTests(unittest.TestCase):
             self.assertEqual(summary.scanned_ports, 1)
             self.assertEqual([item.port for item in results], [port])
             with tempfile.TemporaryDirectory() as folder:
-                txt, csv_file = Path(folder) / "scan.txt", Path(folder) / "scan.csv"
+                txt = Path(folder) / "scan.txt"
                 scanner.write_txt_report(txt, summary, results)
-                scanner.write_csv_report(csv_file, summary, results)
                 self.assertIn(str(port), txt.read_text())
-                with csv_file.open(newline="", encoding="utf-8") as source:
-                    record = list(csv.DictReader(source))[0]
-                self.assertEqual(record["port"], str(port))
-                self.assertEqual(record["status"], "OPEN")
 
     def run_cli(self, *args):
         return subprocess.run([sys.executable, str(PROJECT / "network_scanner.py"), *args], text=True, capture_output=True, timeout=20)
